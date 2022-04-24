@@ -42,16 +42,17 @@ class FenceDataset(Dataset):
 
 def Get_DataLoaders(batch_size, num_workers):
     fence_paths = [f'Fences/{file}' for file in os.listdir('Fences/') if '.png' in file]
-    image_paths = [f'Images/{file}' for file in os.listdir('Images/') if file != '.DS_Store']
+    image_paths = [f'Images/{file}' for file in os.listdir('Images/') if '.png' in file or '.jpeg' in file or '.jpg' in file]
     # TODO Split paths for train and test
 
     # Creating the transforms
     crop = transforms.RandomCrop((480, 640))
     hflip = transforms.RandomHorizontalFlip(p=0.5)
-    jitter = transforms.ColorJitter(brightness=0.5, hue=0.2)
+    jitter = transforms.ColorJitter(brightness=0.4, hue=0.2)
+    blur = transforms.GaussianBlur(9, (0.1,15))
 
     img_transforms = transforms.Compose((hflip, crop))
-    fence_transforms = transforms.Compose((crop, hflip))
+    fence_transforms = transforms.Compose((crop, hflip, blur))
     combined_transforms = transforms.Compose((crop, jitter))
 
     train_dataset = FenceDataset(image_paths, fence_paths, img_transforms, fence_transforms, combined_transforms)
