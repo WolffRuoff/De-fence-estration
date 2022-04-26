@@ -8,6 +8,11 @@ from PIL import Image, UnidentifiedImageError
 from torch.utils.data import DataLoader, Dataset
 from torchvision import transforms
 
+def unnormalize(tensor, mean=(0.485, 0.456, 0.406), std=(0.229, 0.224, 0.225)):
+    for t, m, s in zip(tensor, mean, std):
+        t.mul_(s).add_(m)
+    return tensor
+
 def Get_Image_Paths():
     baseball_field = [f'Images/baseball_field/{file}' for file in os.listdir('Images/baseball_field') if '.jpg' in file]
     canyon = [f'Images/canyon/{file}' for file in os.listdir('Images/canyon') if '.jpg' in file]
@@ -46,13 +51,14 @@ class FenceDataset(Dataset):
         
         combined_img = Overlay_Fence(img, fence)
         
-        if self.combined_transforms:
-            combined_img = self.combined_transforms(combined_img)
-
         # Convert to tensors
         totensor = transforms.ToTensor()
-        img = totensor(img)
-        combined_img = totensor(combined_img)
+        img = totensor(img.convert("RGB"))
+        combined_img = totensor(combined_img.convert("RGB"))
+        
+        if self.combined_transforms:
+            img = self.combined_transforms(img)
+            combined_img = self.combined_transforms(combined_img)
         
         return combined_img, img
 
@@ -60,7 +66,6 @@ def Get_DataLoaders(batch_size, num_workers):
     fence_paths = [f'Fences/{file}' for file in os.listdir('Fences/') if '.png' in file]
     image_paths = Get_Image_Paths()
 
-    # TODO Split paths for train and test
     bounds = [int(len(image_paths)*0.8), int(len(image_paths)*0.9)]
     fence_bounds = [int(len(fence_paths)*0.6), int(len(fence_paths)*0.9)]
     
@@ -77,14 +82,15 @@ def Get_DataLoaders(batch_size, num_workers):
     hflip = transforms.RandomHorizontalFlip(p=0.5)
     jitter = transforms.ColorJitter(brightness=0.3, hue=0.1)
     blur = transforms.GaussianBlur(9, (0.1,15))
+    normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
     img_transforms = transforms.Compose((hflip, jitter))
     fence_transforms = transforms.Compose((resize_crop, hflip, blur))
     #combined_transforms = transforms.Compose((crop, jitter))
 
-    train_dataset = FenceDataset(image_train, fence_train, img_transforms, fence_transforms)
-    val_dataset = FenceDataset(image_val, fence_val, fence_transforms=fence_transforms)
-    test_dataset = FenceDataset(image_test, fence_test, fence_transforms=fence_transforms)
+    train_dataset = FenceDataset(image_train, fence_train, img_transforms, fence_transforms, normalize)
+    val_dataset = FenceDataset(image_val, fence_val, fence_transforms=fence_transforms, combined_transforms=normalize)
+    test_dataset = FenceDataset(image_test, fence_test, fence_transforms=fence_transforms, combined_transforms=normalize)
 
     loader_train = DataLoader(train_dataset, batch_size, shuffle=True, num_workers=num_workers, drop_last=True, pin_memory=True)
     loader_val = DataLoader(val_dataset, batch_size, shuffle=True, num_workers=0, drop_last=True)
@@ -99,12 +105,12 @@ def Get_DataLoaders(batch_size, num_workers):
         figure.add_subplot(rows, cols, i)
         plt.title(f"Image {i}")
         plt.axis("off")
-        plt.imshow(input.permute(1, 2, 0))
+        plt.imshow(unnormalize(input).permute(1, 2, 0))
         j = cols + i
         figure.add_subplot(rows, cols, j)
         plt.title(f"Label {i}")
         plt.axis("off")
-        plt.imshow(label.permute(1, 2, 0))
+        plt.imshow(unnormalize(label).permute(1, 2, 0))
     plt.show()
 
     return loader_train, loader_val, loader_test
