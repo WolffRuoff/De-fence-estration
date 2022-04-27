@@ -1,6 +1,6 @@
 import os
 import random
-
+import cv2
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
@@ -29,6 +29,12 @@ def Overlay_Fence(img, fence):
     combined_img = Image.alpha_composite(combined_img, img)
     return Image.alpha_composite(combined_img, fence)
 
+def Create_Mask(fence):
+    fence_np = np.array(fence)
+    #print(fence_np.shape)
+    ret, mask = cv2.threshold(fence_np[:, :, 3], 50, 255, cv2.THRESH_BINARY)
+    return mask
+
 class FenceDataset(Dataset):
     def __init__(self, image_paths, fence_paths, img_transforms=None, fence_transforms=None, combined_transforms=None):
         self.images_paths = image_paths
@@ -48,7 +54,8 @@ class FenceDataset(Dataset):
             img = self.img_transforms(img)
         if self.fence_transforms:
             fence = self.fence_transforms(fence)
-        
+        mask = Create_Mask(fence)
+
         combined_img = Overlay_Fence(img, fence)
         
         # Convert to tensors
@@ -60,7 +67,7 @@ class FenceDataset(Dataset):
             img = self.combined_transforms(img)
             combined_img = self.combined_transforms(combined_img)
         
-        return combined_img, img
+        return combined_img, img, mask
 
 def Get_DataLoaders(batch_size, num_workers):
     fence_paths = [f'Fences/{file}' for file in os.listdir('Fences/') if '.png' in file]
@@ -77,14 +84,15 @@ def Get_DataLoaders(batch_size, num_workers):
     print(f"Image test={len(image_test)}, Fence test={len(fence_test)}")
 
     # Creating the transforms
-    resize_crop = transforms.RandomResizedCrop((256,256), scale=(0.05, 1))
-    crop = transforms.RandomCrop((256, 256))
+    resize_crop = transforms.RandomResizedCrop((224,224), scale=(0.05, 1))
+    resize = transforms.Resize((224,224))
+    #crop = transforms.RandomCrop((256, 256))
     hflip = transforms.RandomHorizontalFlip(p=0.5)
     jitter = transforms.ColorJitter(brightness=0.3, hue=0.1)
     blur = transforms.GaussianBlur(9, (0.1,15))
     normalize = transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
 
-    img_transforms = transforms.Compose((hflip, jitter))
+    img_transforms = transforms.Compose((resize, hflip, jitter))
     fence_transforms = transforms.Compose((resize_crop, hflip, blur))
     #combined_transforms = transforms.Compose((crop, jitter))
 
@@ -98,10 +106,10 @@ def Get_DataLoaders(batch_size, num_workers):
 
     # View a few samples
     figure = plt.figure(figsize=(30, 10))
-    cols, rows = 5, 2
-    img_batch, mask_batch = next(iter(loader_train))
-    for i in range(1, int((cols * rows)/2 + 1)):
-        input, label = img_batch[i], mask_batch[i]
+    cols, rows = 5, 3
+    img_batch, label_batch, mask_batch, = next(iter(loader_train))
+    for i in range(1, cols+1):
+        input, label, mask = img_batch[i], label_batch[i], mask_batch[i]
         figure.add_subplot(rows, cols, i)
         plt.title(f"Image {i}")
         plt.axis("off")
@@ -111,6 +119,11 @@ def Get_DataLoaders(batch_size, num_workers):
         plt.title(f"Label {i}")
         plt.axis("off")
         plt.imshow(unnormalize(label).permute(1, 2, 0))
+        k = (cols * 2) + i
+        figure.add_subplot(rows, cols, k)
+        plt.title(f"mask {i}")
+        plt.axis("off")
+        plt.imshow(mask)
     plt.show()
 
     return loader_train, loader_val, loader_test
