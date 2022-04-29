@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 import gc
-import Model.trainer as trainer
+from segmentation_model import trainer
 
 # forward pass for inference and evaluation
 def get_inference_output(model, X_in, device):

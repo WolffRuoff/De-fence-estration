@@ -2,8 +2,8 @@ import torch
 import os
 import numpy as np
 import matplotlib.pyplot as plt
-import trainer
-import evaluator
+from segmentation_model import trainer
+from segmentation_model import evaluator
 from dataloader import unnormalize
 from torchvision import transforms
 from PIL import Image

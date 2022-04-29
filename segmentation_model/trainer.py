@@ -3,7 +3,7 @@ import numpy as np
 import os
 import gc
 import torch.nn as nn
-import evaluator
+from segmentation_model import evaluator
 
 
 def get_acc(predictions, labels):
