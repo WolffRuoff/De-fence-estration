@@ -1,0 +1,3 @@
+[submodule "deepfillv2"]
+	path = deepfillv2
+	url = https://github.com/zhaoyuzhi/deepfillv2.git
