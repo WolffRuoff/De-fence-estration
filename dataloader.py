@@ -57,7 +57,6 @@ class FenceDataset(Dataset):
         if self.fence_transforms:
             fence = self.fence_transforms(fence)
         mask = Create_Mask(fence)
-
         combined_img = Overlay_Fence(img, fence)
         
         # Convert to tensors
