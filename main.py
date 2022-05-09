@@ -5,6 +5,7 @@ from torchvision import transforms
 import torch.nn as nn
 import torchvision.models as models
 import numpy as np
+import cv2
 import torch
 from segmentation_model import evaluator
 
@@ -52,10 +53,10 @@ def main():
         img_seg_model = get_model(1)
         mask = evaluator.get_inference_output(img_seg_model, inp, device)
         mask = torch.where(mask > 0, 1, 0).cpu().reshape(1, 256, 256, -1)[0]
-
+        mask = dilate_image(mask)
         # Save the binary mask as a png
         mask_path = out_path + '-mask.png'
-        mask_img = Image.fromarray(np.squeeze(np.asarray(mask*255, dtype=np.uint8), 2))
+        mask_img = Image.fromarray(mask)
         mask_img.save(mask_path, format='PNG')
         print(f"Mask has been saved to {mask_path}")
 
@@ -71,6 +72,12 @@ def get_model(n):
         return model
     else:
         raise Exception("function=get_model: Invalid model number")
+
+def dilate_image(mask):
+    mask = np.asarray(mask, dtype=np.uint8)
+    kernel = np.ones((3,3), np.uint8)
+    dil_mask = cv2.dilate(mask, kernel, iterations=1)
+    return dil_mask*255
 
 if __name__ == '__main__':
     main()
