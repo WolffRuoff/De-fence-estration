@@ -36,6 +36,11 @@ def Create_Mask(fence):
     ret, mask = cv2.threshold(fence_np[:, :, 3], 50, 255, cv2.THRESH_BINARY)
     return mask
 
+def dilate_image(mask):
+    mask = np.asarray(mask, dtype=np.uint8)
+    kernel = np.ones((3,3), np.uint8)
+    dil_mask = cv2.dilate(mask, kernel, iterations=1)
+    return dil_mask
 class FenceDataset(Dataset):
     def __init__(self, image_paths, fence_paths, img_transforms=None, fence_transforms=None, combined_transforms=None, inpainting=False):
         self.images_paths = image_paths
@@ -57,27 +62,30 @@ class FenceDataset(Dataset):
         if self.fence_transforms:
             fence = self.fence_transforms(fence)
         mask = Create_Mask(fence)
-
         combined_img = Overlay_Fence(img, fence)
         
         # Convert to tensors
         totensor = transforms.ToTensor()
-        if self.inpainting:
-            img = totensor(img.convert("RGB"))
+        #if self.inpainting:
+        #    img = totensor(img.convert("RGB"))
 
         combined_img = totensor(combined_img.convert("RGB"))
-        mask = totensor(mask)
         
         if self.combined_transforms and self.inpainting:
             img = totensor(img.convert("RGB"))
             img = self.combined_transforms(img)
             combined_img = self.combined_transforms(combined_img)
+            mask = dilate_image(mask)
+            mask = totensor(mask)
             return combined_img, img, mask
         elif self.combined_transforms:
             combined_img = self.combined_transforms(combined_img)
+            mask = totensor(mask)
             return combined_img, mask
         elif self.inpainting:
             img = totensor(img.convert("RGB"))
+            mask = dilate_image(mask)
+            mask = totensor(mask)
             return combined_img, img, mask
         else:
             return combined_img, mask
@@ -138,7 +146,7 @@ def Get_DataLoaders(batch_size, num_workers, inpainting=False):
             figure.add_subplot(rows, cols, k)
             plt.title(f"mask {i}")
             plt.axis("off")
-            plt.imshow(mask)
+            plt.imshow(mask.permute(1,2,0))
         plt.show()
 
         return loader_train, loader_val, loader_test
